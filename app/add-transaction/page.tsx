@@ -12,6 +12,7 @@ import { addTransaction } from "@/lib/api"
 import { ArrowLeft, Plus, Minus, Calendar, DollarSign, Target } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { LightningLogo } from "@/components/lightning-logo"
 
 export default function AddTransaction() {
   const [transactionType, setTransactionType] = useState("expense")
@@ -87,7 +88,15 @@ export default function AddTransaction() {
               Volver
             </Button>
           </Link>
-          <h1 className="text-lg font-semibold">Agregar Movimiento</h1>
+          <div className="flex items-center space-x-3">
+            <LightningLogo size={24} className="text-primary animate-lightning-glow" />
+            <div className="text-center">
+              <h1 className="text-lg font-bold tracking-tight">
+                <span className="text-primary">Automet</span> <span className="text-foreground">Finanzas</span>
+              </h1>
+              <div className="w-12 h-0.5 bg-gradient-to-r from-primary to-secondary mx-auto"></div>
+            </div>
+          </div>
           <div className="w-20"></div>
         </div>
       </header>

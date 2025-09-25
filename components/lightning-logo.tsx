@@ -14,27 +14,30 @@ export function LightningLogo({ className = "", size = 40 }: LightningLogoProps)
         xmlns="http://www.w3.org/2000/svg"
         className="animate-lightning-glow"
       >
-        {/* Rayo principal */}
         <path
           d="M20 2L12 18H18L16 38L28 22H22L20 2Z"
           fill="url(#lightning-gradient)"
-          stroke="currentColor"
-          strokeWidth="1"
+          stroke="url(#lightning-stroke)"
+          strokeWidth="1.5"
           strokeLinejoin="round"
         />
 
-        {/* Gradiente para el rayo */}
+        {/* Enhanced gradients */}
         <defs>
           <linearGradient id="lightning-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#65ff95" />
-            <stop offset="50%" stopColor="#00d4ff" />
-            <stop offset="100%" stopColor="#0099ff" />
+            <stop offset="0%" stopColor="#22c55e" />
+            <stop offset="50%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#8b5cf6" />
+          </linearGradient>
+          <linearGradient id="lightning-stroke" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#16a34a" />
+            <stop offset="50%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#7c3aed" />
           </linearGradient>
         </defs>
       </svg>
 
-      {/* Efecto de brillo adicional */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-lg blur-sm -z-10" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-full blur-md -z-10 animate-pulse" />
     </div>
   )
 }

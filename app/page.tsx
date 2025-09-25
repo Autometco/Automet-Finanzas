@@ -1,45 +1,48 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { loginUser, registerUser, getCategories } from "@/lib/api"
+import { useRouter } from "next/navigation"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
-import { loginUser, registerUser } from "@/lib/api"
-import { useRouter } from "next/navigation"
-import { TrendingUp, Shield, Target, Sparkles } from "lucide-react"
-import { LightningLogo } from "@/components/lightning-logo"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Eye, EyeOff, Zap, ArrowRight, Check, AlertCircle } from "lucide-react"
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [isLogin, setIsLogin] = useState(true)
+  const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState(1)
+  const [categories, setCategories] = useState([])
+  const [selectedCategories, setSelectedCategories] = useState([])
+  const [error, setError] = useState("")
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false)
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    name: "",
-    occupation: "",
-    monthlyIncome: [1000],
-    mainExpenses: [],
+    firstName: "",
+    lastName: "",
   })
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError("")
     try {
-      const result = await loginUser(formData.email, formData.password)
+      const result = await loginUser(formData)
       if (result.success) {
-        localStorage.setItem("user", JSON.stringify(result.user))
         router.push("/dashboard")
+      } else {
+        setError(result.error || "Error al iniciar sesión")
       }
     } catch (error) {
       console.error("Error al iniciar sesión:", error)
+      setError("Error de conexión")
     } finally {
       setIsLoading(false)
     }
@@ -48,297 +51,291 @@ export default function AuthPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError("")
     try {
-      const result = await registerUser(formData)
+      const result = await registerUser({ ...formData, categories: selectedCategories })
       if (result.success) {
-        localStorage.setItem("user", JSON.stringify(result.user))
-        router.push("/dashboard")
+        if (result.needsEmailConfirmation) {
+          router.push(`/auth/sign-up-success?email=${encodeURIComponent(formData.email)}`)
+        } else {
+          router.push("/dashboard")
+        }
+      } else {
+        setError(result.error || "Error al registrar usuario")
       }
     } catch (error) {
-      console.error("Error al registrarse:", error)
+      console.error("Error al registrar usuario:", error)
+      setError("Error de conexión")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const expenseCategories = [
-    { id: "housing", name: "Vivienda", icon: "🏠" },
-    { id: "food", name: "Alimentación", icon: "🍔" },
-    { id: "transport", name: "Transporte", icon: "🚗" },
-    { id: "entertainment", name: "Entretenimiento", icon: "🎬" },
-    { id: "health", name: "Salud", icon: "🏥" },
-    { id: "education", name: "Educación", icon: "📚" },
-  ]
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const result = await getCategories()
+        setCategories(result.categories)
+      } catch (error) {
+        console.error("Error al cargar categorías:", error)
+      }
+    }
+    loadCategories()
+  }, [])
 
-  const toggleExpenseCategory = (categoryId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      mainExpenses: prev.mainExpenses.includes(categoryId)
-        ? prev.mainExpenses.filter((id) => id !== categoryId)
-        : [...prev.mainExpenses, categoryId],
-    }))
-  }
-
-  const getIncomeRange = (value: number) => {
-    if (value <= 100) return "$0 - $100"
-    if (value <= 500) return "$100 - $500"
-    if (value <= 1000) return "$500 - $1,000"
-    if (value <= 2000) return "$1,000 - $2,000"
-    if (value <= 4000) return "$2,000 - $4,000"
-    return "$4,000+"
+  const toggleCategory = (categoryId: number) => {
+    setSelectedCategories((prev) =>
+      prev.includes(categoryId) ? prev.filter((id) => id !== categoryId) : [...prev, categoryId],
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-card to-muted flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8 animate-fade-in-up">
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center space-x-3">
-            <LightningLogo size={48} className="text-primary" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Automet finanzas
-            </h1>
-          </div>
-          <p className="text-muted-foreground text-balance">
-            Gestiona tus finanzas de manera inteligente y alcanza tus metas
-          </p>
-        </div>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <Card className="border-0 shadow-2xl bg-card/95 backdrop-blur-sm">
+          <CardHeader className="text-center space-y-4">
+            <div className="flex flex-col items-center justify-center gap-3">
+              <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
+                <Zap className="w-7 h-7 text-primary animate-lightning-glow" />
+              </div>
+              <div className="text-center">
+                <h1 className="text-3xl font-bold text-foreground tracking-tight">
+                  <span className="text-primary">Automet</span> <span className="text-foreground">Finanzas</span>
+                </h1>
+                <div className="w-16 h-0.5 bg-gradient-to-r from-primary to-secondary mx-auto mt-2"></div>
+              </div>
+            </div>
+            <p className="text-muted-foreground text-lg font-medium">
+              Tu asistente inteligente para el control financiero personal
+            </p>
+          </CardHeader>
 
-        {step === 1 && (
-          <Card className="border-border/50 shadow-2xl bg-card/80 backdrop-blur-sm">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-xl text-foreground">¡Bienvenido!</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Comienza tu viaje hacia la libertad financiera
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="login" className="space-y-4">
-                <TabsList className="grid w-full grid-cols-2 bg-muted">
-                  <TabsTrigger value="login" className="text-foreground">
-                    Iniciar Sesión
-                  </TabsTrigger>
-                  <TabsTrigger value="register" className="text-foreground">
-                    Registrarse
-                  </TabsTrigger>
-                </TabsList>
+          <CardContent className="space-y-6">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-                <TabsContent value="login" className="space-y-4">
-                  <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-4">
+              {!isLogin && step === 1 && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-foreground">
-                        Correo electrónico
-                      </Label>
+                      <Label htmlFor="firstName">Nombre</Label>
                       <Input
-                        id="email"
-                        type="email"
-                        placeholder="tu@email.com"
-                        value={formData.email}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                        id="firstName"
+                        type="text"
+                        placeholder="Tu nombre"
+                        value={formData.firstName}
+                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                        className="bg-input border-border"
                         required
-                        className="bg-input border-border text-foreground placeholder:text-muted-foreground"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="password" className="text-foreground">
-                        Contraseña
-                      </Label>
+                      <Label htmlFor="lastName">Apellido</Label>
+                      <Input
+                        id="lastName"
+                        type="text"
+                        placeholder="Tu apellido"
+                        value={formData.lastName}
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        className="bg-input border-border"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="bg-input border-border"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Contraseña</Label>
+                    <div className="relative">
                       <Input
                         id="password"
-                        type="password"
-                        placeholder="••••••••"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Tu contraseña"
                         value={formData.password}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="bg-input border-border pr-10"
                         required
-                        className="bg-input border-border text-foreground placeholder:text-muted-foreground"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
-                    <Button
-                      type="submit"
-                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-                    </Button>
-                  </form>
-                </TabsContent>
+                  </div>
+                </>
+              )}
 
-                <TabsContent value="register" className="space-y-4">
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      setStep(2)
-                    }}
-                    className="space-y-4"
-                  >
-                    <div className="space-y-2">
-                      <Label htmlFor="register-email" className="text-foreground">
-                        Correo electrónico
-                      </Label>
-                      <Input
-                        id="register-email"
-                        type="email"
-                        placeholder="tu@email.com"
-                        value={formData.email}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                        required
-                        className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-password" className="text-foreground">
-                        Contraseña
-                      </Label>
-                      <Input
-                        id="register-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={formData.password}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                        required
-                        className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                      />
-                    </div>
-                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              {!isLogin && step === 2 && (
+                <div className="space-y-4">
+                  <div className="text-center space-y-2">
+                    <h3 className="text-lg font-semibold text-foreground">Selecciona tus categorías</h3>
+                    <p className="text-sm text-muted-foreground">Opcional: Elige las categorías que más uses</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+                    {categories.map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => toggleCategory(category.id)}
+                        className={`p-3 rounded-lg border transition-all duration-200 text-left ${
+                          selectedCategories.includes(category.id)
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-card hover:bg-muted"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{category.icon}</span>
+                          <span className="text-sm font-medium">{category.name}</span>
+                          {selectedCategories.includes(category.id) && (
+                            <Check className="w-4 h-4 text-primary ml-auto" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1">
+                      Atrás
+                    </Button>
+                    <Button type="button" onClick={() => setStep(3)} className="flex-1">
                       Continuar
+                      <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 2 && (
-          <Card className="border-border/50 shadow-2xl bg-card/80 backdrop-blur-sm animate-slide-in-right">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-xl flex items-center justify-center gap-2 text-foreground">
-                <Sparkles className="w-5 h-5 text-primary" />
-                Personaliza tu experiencia
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Cuéntanos sobre ti para brindarte mejores recomendaciones
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-foreground">
-                  ¿Cómo te llamas?
-                </Label>
-                <Input
-                  id="name"
-                  placeholder="Tu nombre"
-                  value={formData.name}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                  required
-                  className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="occupation" className="text-foreground">
-                  ¿A qué te dedicas?
-                </Label>
-                <Select onValueChange={(value) => setFormData((prev) => ({ ...prev, occupation: value }))}>
-                  <SelectTrigger className="bg-input border-border text-foreground">
-                    <SelectValue placeholder="Selecciona tu ocupación" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    <SelectItem value="student">Estudiante</SelectItem>
-                    <SelectItem value="employee">Empleado</SelectItem>
-                    <SelectItem value="freelancer">Freelancer</SelectItem>
-                    <SelectItem value="entrepreneur">Emprendedor</SelectItem>
-                    <SelectItem value="retired">Jubilado</SelectItem>
-                    <SelectItem value="other">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-4">
-                <Label className="text-foreground">Ingresos mensuales aproximados</Label>
-                <div className="px-2">
-                  <Slider
-                    value={formData.monthlyIncome}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, monthlyIncome: value }))}
-                    max={5000}
-                    min={0}
-                    step={100}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                    <span>$0</span>
-                    <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
-                      {getIncomeRange(formData.monthlyIncome[0])}
-                    </Badge>
-                    <span>$4,000+</span>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="space-y-4">
-                <Label className="text-foreground">Gastos principales (opcional)</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {expenseCategories.map((category) => (
-                    <Button
-                      key={category.id}
-                      type="button"
-                      variant={formData.mainExpenses.includes(category.id) ? "default" : "outline"}
-                      className={`h-auto p-3 flex flex-col items-center gap-2 transition-all duration-200 hover-lift-subtle ${
-                        formData.mainExpenses.includes(category.id)
-                          ? "bg-green-600 hover:bg-green-700 text-white border-green-600"
-                          : "bg-card hover:bg-accent border-border"
-                      }`}
-                      onClick={() => toggleExpenseCategory(category.id)}
-                    >
-                      <span className="text-lg">{category.icon}</span>
-                      <span className="text-xs">{category.name}</span>
+              {isLogin && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="bg-input border-border"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Contraseña</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Tu contraseña"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="bg-input border-border pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {(isLogin || (!isLogin && step === 1)) && (
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  {isLoading
+                    ? isLogin
+                      ? "Iniciando sesión..."
+                      : "Continuando..."
+                    : isLogin
+                      ? "Iniciar Sesión"
+                      : "Continuar"}
+                  {!isLogin && <ArrowRight className="w-4 h-4 ml-2" />}
+                </Button>
+              )}
+
+              {!isLogin && step === 3 && (
+                <div className="space-y-4">
+                  <div className="text-center space-y-2">
+                    <h3 className="text-lg font-semibold text-foreground">¡Listo para comenzar!</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedCategories.length > 0
+                        ? `Has seleccionado ${selectedCategories.length} categorías`
+                        : "Puedes agregar categorías más tarde"}
+                    </p>
+                  </div>
+
+                  {selectedCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {categories
+                        .filter((cat) => selectedCategories.includes(cat.id))
+                        .map((category) => (
+                          <Badge key={category.id} variant="secondary" className="text-xs">
+                            {category.icon} {category.name}
+                          </Badge>
+                        ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <Button type="button" variant="outline" onClick={() => setStep(2)} className="flex-1">
+                      Atrás
                     </Button>
-                  ))}
+                    <Button type="submit" disabled={isLoading} className="flex-1 bg-primary hover:bg-primary/90">
+                      {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
+            </form>
 
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep(1)}
-                  className="flex-1 border-border hover:bg-accent"
+            <div className="text-center">
+              <p className="text-muted-foreground text-sm">
+                {isLogin ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
+                <button
+                  onClick={() => {
+                    setIsLogin(!isLogin)
+                    setStep(1)
+                    setSelectedCategories([])
+                    setError("")
+                  }}
+                  className="text-primary hover:text-primary/80 font-medium"
                 >
-                  Atrás
-                </Button>
-                <Button
-                  onClick={handleRegister}
-                  disabled={isLoading || !formData.name || !formData.occupation}
-                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
-                >
-                  {isLoading ? "Creando cuenta..." : "Crear cuenta"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Features */}
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="space-y-2">
-            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center mx-auto">
-              <Shield className="w-4 h-4 text-primary" />
+                  {isLogin ? "Regístrate" : "Inicia sesión"}
+                </button>
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">Seguro</p>
-          </div>
-          <div className="space-y-2">
-            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center mx-auto">
-              <Target className="w-4 h-4 text-primary" />
-            </div>
-            <p className="text-xs text-muted-foreground">Metas</p>
-          </div>
-          <div className="space-y-2">
-            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center mx-auto">
-              <TrendingUp className="w-4 h-4 text-primary" />
-            </div>
-            <p className="text-xs text-muted-foreground">Análisis</p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
