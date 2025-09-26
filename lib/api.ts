@@ -344,7 +344,7 @@ export const addSavingsGoal = async (goalData: any) => {
         user_id: user.id,
         name: goalData.name,
         target_amount: goalData.target,
-        target_date: goalData.targetDate,
+        target_date: goalData.targetDate || null, // Use null if targetDate is not provided
         current_amount: 0,
       })
       .select()

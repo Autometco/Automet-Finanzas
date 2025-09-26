@@ -94,7 +94,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [authError, setAuthError] = useState(false)
-  const [newGoal, setNewGoal] = useState({ name: "", target: "", color: "#22c55e" })
+  const [newGoal, setNewGoal] = useState({ name: "", target: "", color: "#22c55e", targetDate: "" })
   const [isAddingGoal, setIsAddingGoal] = useState(false)
   const [chartView, setChartView] = useState("pie")
   const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false)
@@ -205,10 +205,12 @@ export default function Dashboard() {
   const handleAddGoal = async () => {
     if (newGoal.name && newGoal.target) {
       try {
+        console.log("[v0] Creating goal with data:", newGoal)
         const result = await addSavingsGoal({
           name: newGoal.name,
           target: Number.parseInt(newGoal.target),
           color: newGoal.color,
+          targetDate: newGoal.targetDate || null,
         })
 
         if (result.success) {
@@ -216,11 +218,13 @@ export default function Dashboard() {
             ...prev,
             savingsGoals: [...prev.savingsGoals, result.goal],
           }))
-          setNewGoal({ name: "", target: "", color: "#22c55e" })
+          setNewGoal({ name: "", target: "", color: "#22c55e", targetDate: "" })
           setIsAddingGoal(false)
+        } else {
+          console.error("[v0] Error creating goal:", result.error)
         }
       } catch (error) {
-        console.error("Error al agregar meta:", error)
+        console.error("[v0] Error al agregar meta:", error)
       }
     }
   }
@@ -880,6 +884,18 @@ export default function Dashboard() {
                             placeholder="50000"
                             value={newGoal.target}
                             onChange={(e) => setNewGoal((prev) => ({ ...prev, target: e.target.value }))}
+                            className="bg-input border-border text-foreground"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="goal-target-date" className="text-foreground">
+                            Fecha objetivo (opcional)
+                          </Label>
+                          <Input
+                            id="goal-target-date"
+                            type="date"
+                            value={newGoal.targetDate}
+                            onChange={(e) => setNewGoal((prev) => ({ ...prev, targetDate: e.target.value }))}
                             className="bg-input border-border text-foreground"
                           />
                         </div>
