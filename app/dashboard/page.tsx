@@ -57,6 +57,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { LightningLogo } from "@/components/lightning-logo"
+import { LightningLoading } from "@/components/lightning-loading"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
@@ -92,6 +93,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
+  const [authError, setAuthError] = useState(false)
   const [newGoal, setNewGoal] = useState({ name: "", target: "", color: "#22c55e" })
   const [isAddingGoal, setIsAddingGoal] = useState(false)
   const [chartView, setChartView] = useState("pie")
@@ -138,7 +140,10 @@ export default function Dashboard() {
 
         if (!supabaseUser) {
           console.log("[v0] No hay usuario autenticado, redirigiendo al login")
-          router.push("/")
+          setAuthError(true)
+          setTimeout(() => {
+            router.push("/")
+          }, 1500) // Give time for the loading animation to show
           return
         }
 
@@ -156,9 +161,12 @@ export default function Dashboard() {
 
         if (result.error) {
           console.error("[v0] Error cargando dashboard:", result.error)
-          // Si hay error de autenticación, redirigir al login
+          // If there's an authentication error, redirect to login
           if (result.error.includes("autenticado")) {
-            router.push("/")
+            setAuthError(true)
+            setTimeout(() => {
+              router.push("/")
+            }, 1500)
             return
           }
         } else {
@@ -179,8 +187,10 @@ export default function Dashboard() {
         }
       } catch (error) {
         console.error("Error al cargar datos:", error)
-        // En caso de error, redirigir al login
-        router.push("/")
+        setAuthError(true)
+        setTimeout(() => {
+          router.push("/")
+        }, 1500)
       } finally {
         setLoading(false)
       }
@@ -331,40 +341,17 @@ export default function Dashboard() {
     return () => clearTimeout(timeout)
   }, [])
 
+  if (authError) {
+    return <LightningLoading message="Verificando acceso..." />
+  }
+
   if (loading && gastosLoading && !loadingTimeout) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <LightningLogo size={64} className="text-primary animate-pulse mx-auto" />
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-foreground">Cargando tu dashboard</h2>
-            <div className="flex items-center justify-center space-x-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <LightningLoading message="Cargando tu dashboard" />
   }
 
   if (loadingTimeout || (!loading && !gastosLoading)) {
     if (!data) {
-      return (
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <LightningLogo size={64} className="text-primary animate-pulse mx-auto" />
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold text-foreground">Error al cargar datos</h2>
-              <p className="text-muted-foreground">No se pudieron cargar los datos del dashboard</p>
-              <Button onClick={() => window.location.reload()} className="mt-4">
-                Reintentar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )
+      return <LightningLoading message="Preparando tus datos..." />
     }
 
     const { summary, categories, recentTransactions, savingsGoals } = data
