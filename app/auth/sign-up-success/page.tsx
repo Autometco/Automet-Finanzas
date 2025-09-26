@@ -14,6 +14,8 @@ export default function Page() {
   const [canResend, setCanResend] = useState(false)
   const [isResending, setIsResending] = useState(false)
   const [resendMessage, setResendMessage] = useState("")
+  const [resendAttempts, setResendAttempts] = useState(0)
+  const [lastResendTime, setLastResendTime] = useState<number | null>(null)
   const searchParams = useSearchParams()
   const email = searchParams.get("email") || ""
 
@@ -32,6 +34,24 @@ export default function Page() {
       return
     }
 
+    // Check if we've hit the hourly limit (2 emails per hour)
+    const now = Date.now()
+    if (lastResendTime && resendAttempts >= 2) {
+      const timeSinceLastResend = now - lastResendTime
+      const oneHour = 60 * 60 * 1000
+
+      if (timeSinceLastResend < oneHour) {
+        const remainingTime = Math.ceil((oneHour - timeSinceLastResend) / (60 * 1000))
+        setResendMessage(
+          `Has alcanzado el límite de reenvíos (2 por hora). Podrás intentar nuevamente en ${remainingTime} minutos.`,
+        )
+        return
+      } else {
+        // Reset attempts after an hour
+        setResendAttempts(0)
+      }
+    }
+
     setIsResending(true)
     setResendMessage("")
 
@@ -39,17 +59,34 @@ export default function Page() {
       const result = await resendConfirmationEmail(email)
 
       if (result.success) {
-        setResendMessage("¡Email reenviado exitosamente! Revisa tu bandeja de entrada.")
+        setResendMessage("¡Email reenviado exitosamente! Revisa tu bandeja de entrada y carpeta de spam.")
         setCountdown(60)
         setCanResend(false)
+        setResendAttempts((prev) => prev + 1)
+        setLastResendTime(now)
       } else {
-        setResendMessage(result.error || "Error al reenviar el email")
+        // Handle specific Supabase rate limiting errors
+        if (result.error?.includes("rate limit") || result.error?.includes("too many requests")) {
+          setResendMessage(
+            "Has alcanzado el límite de reenvíos. Supabase permite máximo 2 emails por hora. Intenta más tarde.",
+          )
+        } else if (result.error?.includes("Email rate limit exceeded")) {
+          setResendMessage("Límite de emails excedido. Espera unos minutos antes de intentar nuevamente.")
+        } else {
+          setResendMessage(result.error || "Error al reenviar el email. Intenta más tarde.")
+        }
       }
     } catch (error) {
-      setResendMessage("Error de conexión al reenviar el email")
+      setResendMessage("Error de conexión al reenviar el email. Verifica tu conexión a internet.")
     } finally {
       setIsResending(false)
     }
+  }
+
+  const getRemainingAttempts = () => {
+    if (resendAttempts === 0) return "2 reenvíos disponibles"
+    if (resendAttempts === 1) return "1 reenvío disponible"
+    return "Sin reenvíos disponibles por 1 hora"
   }
 
   return (
@@ -83,17 +120,23 @@ export default function Page() {
 
               <div className="text-center space-y-3">
                 {!canResend ? (
-                  <p className="text-sm text-gray-400">
-                    ¿No recibiste el email? Podrás reenviar en{" "}
-                    <span className="font-semibold text-blue-400">{countdown}s</span>
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-400">
+                      ¿No recibiste el email? Podrás reenviar en{" "}
+                      <span className="font-semibold text-blue-400">{countdown}s</span>
+                    </p>
+                    <p className="text-xs text-gray-500">{getRemainingAttempts()}</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     <Button
                       onClick={handleResendEmail}
-                      disabled={isResending}
+                      disabled={
+                        isResending ||
+                        (resendAttempts >= 2 && lastResendTime && Date.now() - lastResendTime < 60 * 60 * 1000)
+                      }
                       variant="outline"
-                      className="w-full bg-transparent border-gray-700 text-white hover:bg-gray-800"
+                      className="w-full bg-transparent border-gray-700 text-white hover:bg-gray-800 disabled:opacity-50"
                     >
                       {isResending ? (
                         <>
@@ -107,15 +150,34 @@ export default function Page() {
                         </>
                       )}
                     </Button>
+
+                    <p className="text-xs text-gray-500">{getRemainingAttempts()}</p>
+
                     {resendMessage && (
-                      <p
-                        className={`text-sm ${resendMessage.includes("exitosamente") ? "text-green-400" : "text-red-400"}`}
-                      >
-                        {resendMessage}
-                      </p>
+                      <div className="space-y-1">
+                        <p
+                          className={`text-sm ${resendMessage.includes("exitosamente") ? "text-green-400" : "text-red-400"}`}
+                        >
+                          {resendMessage}
+                        </p>
+                        {resendMessage.includes("exitosamente") && (
+                          <p className="text-xs text-gray-500">
+                            Si no lo encuentras, revisa tu carpeta de spam o correo no deseado.
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="border-t border-gray-800 pt-4">
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p className="font-medium text-gray-400">💡 Consejos:</p>
+                  <p>• Revisa tu carpeta de spam o correo no deseado</p>
+                  <p>• Asegúrate de que el email sea correcto: {email}</p>
+                  <p>• Los emails pueden tardar hasta 5 minutos en llegar</p>
+                </div>
               </div>
 
               <Link href="/">

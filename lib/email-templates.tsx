@@ -1,0 +1,118 @@
+// Template personalizado para confirmación de email
+export const confirmationEmailTemplate = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirma tu correo electrónico</title>
+    <style>
+        /* Estilos generales */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #343a40;
+        }
+        /* Contenedor principal */
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        /* Encabezado */
+        .header {
+            padding: 25px;
+            text-align: center;
+            background-color: #0d6efd;
+            color: #ffffff;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        /* Cuerpo del correo */
+        .content {
+            padding: 30px 40px;
+            text-align: center;
+        }
+        .content h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #212529;
+            margin-top: 0;
+        }
+        .content p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 15px 0;
+        }
+        /* Botón de llamada a la acción */
+        .cta-button {
+            display: inline-block;
+            background-color: #0d6efd;
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .cta-button:hover {
+            background-color: #0b5ed7;
+        }
+        /* Pie de página */
+        .footer {
+            background-color: #f1f3f5;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .footer a {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#f8f9fa">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <div class="container">
+                    <div class="header">
+                        <h1>Automet Finanzas</h1>
+                    </div>
+
+                    <div class="content">
+                        <h2>¡Bienvenido a bordo!</h2>
+                        <p>Gracias por unirte a <strong>Automet Finanzas</strong>. Estamos emocionados de ayudarte a tomar el control de tus finanzas personales.</p>
+                        <p>Solo falta un paso más. Por favor, confirma tu dirección de correo electrónico haciendo clic en el botón de abajo.</p>
+                        
+                        <a href="{{ .ConfirmationURL }}" class="cta-button">Confirmar correo</a>
+                        
+                        <p style="font-size: 14px; color: #6c757d;">Si no te registraste en Automet Finanzas, puedes ignorar este correo sin problemas.</p>
+                    </div>
+
+                    <div class="footer">
+                        <p>Si tienes alguna pregunta, no dudes en <a href="mailto:soporte@autometfinanzas.com">contactarnos</a>.</p>
+                        <p>&copy; 2025 Automet Finanzas. Todos los derechos reservados.</p>
+                    </div>
+                </div>
+                </td>
+        </tr>
+    </table>
+</body>
+</html>
+`

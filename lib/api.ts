@@ -551,6 +551,20 @@ export const resendConfirmationEmail = async (email: string) => {
 
     if (error) {
       console.error("[v0] Error reenviando email:", error.message)
+      if (error.message.includes("rate limit") || error.message.includes("too many requests")) {
+        return {
+          success: false,
+          error: "Has alcanzado el límite de reenvíos. Supabase permite máximo 2 emails por hora. Intenta más tarde.",
+          rateLimited: true,
+        }
+      }
+      if (error.message.includes("Email rate limit exceeded")) {
+        return {
+          success: false,
+          error: "Límite de emails excedido. Espera al menos 60 segundos antes de intentar nuevamente.",
+          rateLimited: true,
+        }
+      }
       return { success: false, error: error.message }
     }
 
