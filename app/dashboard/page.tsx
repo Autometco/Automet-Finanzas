@@ -419,52 +419,64 @@ export default function Dashboard() {
 
         {/* Header */}
         <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <LightningLogo size={40} className="text-primary animate-lightning-glow" />
-              <div className="flex flex-col">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  <span className="text-primary">Automet</span> <span className="text-foreground">Finanzas</span>
-                </h1>
-                <div className="w-20 h-0.5 bg-gradient-to-r from-primary to-secondary"></div>
-                {user?.name && <p className="text-sm text-muted-foreground mt-1 font-medium">Hola, {user.name}</p>}
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+              {/* Logo and greeting section */}
+              <div className="flex items-center space-x-4">
+                <LightningLogo size={40} className="text-primary animate-lightning-glow" />
+                <div className="flex flex-col">
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight">
+                    <span className="text-primary">Automet</span> <span className="text-foreground">Finanzas</span>
+                  </h1>
+                  <div className="w-20 h-0.5 bg-gradient-to-r from-primary to-secondary"></div>
+                  {user?.name && <p className="text-sm text-muted-foreground mt-1 font-medium">Hola, {user.name}</p>}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link href="/add-transaction">
-                <Button className="animate-pulse-success hover-lift-subtle">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Agregar
-                </Button>
-              </Link>
-              <Dialog open={isNewMonthDialogOpen} onOpenChange={setIsNewMonthDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="hover-lift-subtle bg-transparent">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Nuevo Mes
+
+              {/* Action buttons - redesigned for mobile */}
+              <div className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-2">
+                {/* Primary action button - full width on mobile */}
+                <Link href="/add-transaction" className="w-full md:w-auto">
+                  <Button className="animate-pulse-success hover-lift-subtle w-full">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Agregar Transacción
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-card border-border">
-                  <DialogHeader>
-                    <DialogTitle className="text-foreground">Iniciar Nuevo Mes</DialogTitle>
-                    <DialogDescription className="text-muted-foreground">
-                      Esto guardará las estadísticas del mes actual y limpiará las transacciones para empezar de nuevo.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="flex gap-2 pt-4">
-                    <Button variant="outline" onClick={() => setIsNewMonthDialogOpen(false)} className="flex-1">
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleNewMonth} className="flex-1">
-                      Confirmar
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Button variant="outline" onClick={handleLogout} className="hover-lift-subtle bg-transparent">
-                <LogOut className="w-4 h-4 mr-2" />
-                Salir
-              </Button>
+                </Link>
+
+                {/* Secondary actions - side by side on mobile */}
+                <div className="flex space-x-2">
+                  <Dialog open={isNewMonthDialogOpen} onOpenChange={setIsNewMonthDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="hover-lift-subtle bg-transparent flex-1">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Nuevo Mes
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-card border-border">
+                      <DialogHeader>
+                        <DialogTitle className="text-foreground">Iniciar Nuevo Mes</DialogTitle>
+                        <DialogDescription className="text-muted-foreground">
+                          Esto guardará las estadísticas del mes actual y limpiará las transacciones para empezar de
+                          nuevo.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex gap-2 pt-4">
+                        <Button variant="outline" onClick={() => setIsNewMonthDialogOpen(false)} className="flex-1">
+                          Cancelar
+                        </Button>
+                        <Button onClick={handleNewMonth} className="flex-1">
+                          Confirmar
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Button variant="outline" onClick={handleLogout} className="hover-lift-subtle bg-transparent flex-1">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Salir
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </header>
@@ -752,7 +764,7 @@ export default function Dashboard() {
           {/* Savings Goals */}
           <Card className="animate-fade-in-up border-0 shadow-lg hover-lift" style={{ animationDelay: "0.5s" }}>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="space-y-4 md:space-y-0">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Target className="w-5 h-5 text-primary" />
@@ -760,10 +772,11 @@ export default function Dashboard() {
                   </CardTitle>
                   <CardDescription>Tu progreso hacia tus objetivos financieros</CardDescription>
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
                   <Dialog open={isDepositDialogOpen} onOpenChange={setIsDepositDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" className="hover-lift-subtle bg-transparent">
+                      <Button variant="outline" className="hover-lift-subtle bg-transparent w-full sm:w-auto">
                         <PiggyBank className="w-4 h-4 mr-2" />
                         Depósito de Ahorro
                       </Button>
@@ -851,7 +864,7 @@ export default function Dashboard() {
 
                   <Dialog open={isAddingGoal} onOpenChange={setIsAddingGoal}>
                     <DialogTrigger asChild>
-                      <Button className="hover-lift-subtle">
+                      <Button className="hover-lift-subtle w-full sm:w-auto">
                         <Plus className="w-4 h-4 mr-2" />
                         Nueva Meta
                       </Button>
@@ -933,7 +946,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {hasSavingsGoals ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {savingsGoals.map((goal) => {
                     const progress = ((goal.current_amount || 0) / (goal.target_amount || 1)) * 100
                     return (
@@ -949,8 +962,8 @@ export default function Dashboard() {
                         >
                           <X className="w-3 h-3" />
                         </Button>
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium">{goal.name}</h4>
+                        <div className="flex items-center justify-between pr-8">
+                          <h4 className="font-medium text-sm sm:text-base truncate">{goal.name}</h4>
                           <Badge variant="secondary" style={{ backgroundColor: `${goal.color}20`, color: goal.color }}>
                             {Math.round(progress)}%
                           </Badge>
