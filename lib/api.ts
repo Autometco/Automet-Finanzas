@@ -71,7 +71,8 @@ export const registerUser = async (userData: any) => {
       email: userData.email,
       password: userData.password,
       options: {
-        emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/confirm`,
+        emailRedirectTo:
+          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || "https://finanzas.autometve.com/auth/confirm",
         data: {
           name: userData.firstName + " " + userData.lastName,
           firstName: userData.firstName,
@@ -545,7 +546,8 @@ export const resendConfirmationEmail = async (email: string) => {
       type: "signup",
       email: email,
       options: {
-        emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/confirm`,
+        emailRedirectTo:
+          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || "https://finanzas.autometve.com/auth/confirm",
       },
     })
 
