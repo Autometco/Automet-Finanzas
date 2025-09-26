@@ -384,11 +384,12 @@ export const depositToSavingsGoal = async (goalId: string, amount: number, sourc
     const { data: goal, error: goalError } = await supabase
       .from("savings_goals")
       .select("*")
-      .eq("id", goalId)
+      .eq("id", goalId) // Use goalId directly as UUID string
       .eq("user_id", user.id)
       .single()
 
     if (goalError || !goal) {
+      console.error("[v0] Error finding goal:", goalError)
       return { success: false, error: "Meta no encontrada" }
     }
 
@@ -398,7 +399,7 @@ export const depositToSavingsGoal = async (goalId: string, amount: number, sourc
     const { error: updateError } = await supabase
       .from("savings_goals")
       .update({ current_amount: newCurrent })
-      .eq("id", goalId)
+      .eq("id", goalId) // Use goalId directly as UUID string
 
     if (updateError) {
       console.error("[v0] Error actualizando meta:", updateError)

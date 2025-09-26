@@ -208,7 +208,7 @@ export default function Dashboard() {
         console.log("[v0] Creating goal with data:", newGoal)
         const result = await addSavingsGoal({
           name: newGoal.name,
-          target: Number.parseInt(newGoal.target),
+          target: Number.parseFloat(newGoal.target), // Use parseFloat for decimal amounts
           color: newGoal.color,
           targetDate: newGoal.targetDate || null,
         })
@@ -233,20 +233,20 @@ export default function Dashboard() {
     if (selectedGoalId && depositAmount && depositSource) {
       try {
         const result = await depositToSavingsGoal(
-          Number.parseInt(selectedGoalId),
-          Number.parseInt(depositAmount),
+          selectedGoalId, // Keep as string UUID
+          Number.parseFloat(depositAmount), // Use parseFloat for decimal amounts
           depositSource,
         )
 
         if (result.success) {
           const updatedGoal = result.goal
-          const isCompleted = updatedGoal.current >= updatedGoal.target
+          const isCompleted = updatedGoal.current_amount >= updatedGoal.target_amount
           const wasAlreadyCompleted = completedGoals.has(updatedGoal.id)
 
           setData((prev) => ({
             ...prev,
-            savingsGoals: prev.savingsGoals.map((goal) =>
-              goal.id === Number.parseInt(selectedGoalId) ? result.goal : goal,
+            savingsGoals: prev.savingsGoals.map(
+              (goal) => (goal.id === selectedGoalId ? result.goal : goal), // Compare UUIDs directly as strings
             ),
           }))
 
@@ -255,8 +255,8 @@ export default function Dashboard() {
               ...prev,
               summary: {
                 ...prev.summary,
-                expenses: prev.summary.expenses + Number.parseInt(depositAmount),
-                balance: prev.summary.balance - Number.parseInt(depositAmount),
+                expenses: prev.summary.expenses + Number.parseFloat(depositAmount),
+                balance: prev.summary.balance - Number.parseFloat(depositAmount),
               },
             }))
           }
@@ -320,7 +320,7 @@ export default function Dashboard() {
     // Remover la meta completada cuando el usuario cierre el mensaje
     setData((prev) => ({
       ...prev,
-      savingsGoals: prev.savingsGoals.filter((goal) => goal.current < goal.target),
+      savingsGoals: prev.savingsGoals.filter((goal) => goal.current_amount < goal.target_amount),
     }))
   }
 
@@ -545,7 +545,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-center">
-                    <p className="text-3xl font-bold text-success">{motivationalStats.savingsPercentage}%</p>
+                    <p className="text-3xl font-bold text-success">{motivationalStats?.savingsPercentage || 0}%</p>
                     <p className="text-sm text-muted-foreground">de tus ingresos este mes</p>
                   </div>
                 </CardContent>
@@ -561,7 +561,7 @@ export default function Dashboard() {
                 <CardContent>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-primary">
-                      ${motivationalStats.yearEndProjection.toLocaleString()}
+                      ${(motivationalStats?.yearEndProjection || 0).toLocaleString()}
                     </p>
                     <p className="text-sm text-muted-foreground">si sigues así todo el año</p>
                   </div>
@@ -577,7 +577,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-center">
-                    <p className="text-3xl font-bold text-warning">{motivationalStats.goalsProgress}%</p>
+                    <p className="text-3xl font-bold text-warning">{motivationalStats?.goalsProgress || 0}%</p>
                     <p className="text-sm text-muted-foreground">de tus objetivos completados</p>
                   </div>
                 </CardContent>
@@ -633,7 +633,7 @@ export default function Dashboard() {
                               })}
                             </Pie>
                             <Tooltip
-                              formatter={(value) => [`$${value.toLocaleString()}`, "Gastado"]}
+                              formatter={(value) => [`$${(value || 0).toLocaleString()}`, "Gastado"]}
                               labelFormatter={(label) => {
                                 const category = categories.find((c) => c.name === label)
                                 return category ? category.name : label
@@ -645,7 +645,7 @@ export default function Dashboard() {
                           <BarChart data={categories} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                             <XAxis dataKey="name" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
                             <YAxis tick={{ fontSize: 12 }} />
-                            <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, "Gastado"]} />
+                            <Tooltip formatter={(value) => [`$${(value || 0).toLocaleString()}`, "Gastado"]} />
                             <Bar dataKey="spent" radius={[4, 4, 0, 0]}>
                               {categories.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
@@ -663,7 +663,7 @@ export default function Dashboard() {
                             style={{ backgroundColor: category.color }}
                           ></div>
                           <span className="text-xs text-muted-foreground truncate">{category.name}</span>
-                          <span className="text-xs font-medium ml-auto">${category.spent?.toLocaleString()}</span>
+                          <span className="text-xs font-medium ml-auto">${(category.spent || 0).toLocaleString()}</span>
                         </div>
                       ))}
                     </div>
@@ -720,7 +720,8 @@ export default function Dashboard() {
                               transaction.type === "income" ? "text-success" : "text-destructive"
                             }`}
                           >
-                            {transaction.type === "income" ? "+" : ""}${Math.abs(transaction.amount).toLocaleString()}
+                            {transaction.type === "income" ? "+" : ""}$
+                            {Math.abs(transaction.amount || 0).toLocaleString()}
                           </p>
                           <p className="text-xs text-muted-foreground">{transaction.date}</p>
                         </div>
@@ -787,7 +788,8 @@ export default function Dashboard() {
                               <SelectContent>
                                 {savingsGoals.map((goal) => (
                                   <SelectItem key={goal.id} value={goal.id.toString()}>
-                                    {goal.name} (${goal.current.toLocaleString()} / ${goal.target.toLocaleString()})
+                                    {goal.name} (${(goal.current_amount || 0).toLocaleString()} / $
+                                    {(goal.target_amount || 0).toLocaleString()})
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -933,7 +935,7 @@ export default function Dashboard() {
               {hasSavingsGoals ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {savingsGoals.map((goal) => {
-                    const progress = (goal.current / goal.target) * 100
+                    const progress = ((goal.current_amount || 0) / (goal.target_amount || 1)) * 100
                     return (
                       <div
                         key={goal.id}
@@ -955,8 +957,8 @@ export default function Dashboard() {
                         </div>
                         <Progress value={progress} className="h-2" />
                         <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>${goal.current.toLocaleString()}</span>
-                          <span>${goal.target.toLocaleString()}</span>
+                          <span>${(goal.current_amount || 0).toLocaleString()}</span>
+                          <span>${(goal.target_amount || 0).toLocaleString()}</span>
                         </div>
                       </div>
                     )
@@ -1013,7 +1015,7 @@ export default function Dashboard() {
                       <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
                         formatter={(value, name) => [
-                          `$${value.toLocaleString()}`,
+                          `$${(value || 0).toLocaleString()}`,
                           name === "income" ? "Ingresos" : name === "expenses" ? "Gastos" : "Ahorros",
                         ]}
                         labelFormatter={(value) => {
