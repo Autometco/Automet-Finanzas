@@ -53,37 +53,39 @@ export default function Page() {
   }
 
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10 bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10 bg-black">
       <div className="w-full max-w-sm">
         <div className="flex flex-col gap-6">
           <div className="flex justify-center">
             <div className="flex items-center gap-3">
               <LightningLogo className="h-8 w-8" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
                 Automet Finanzas
               </span>
             </div>
           </div>
 
-          <Card className="border-0 shadow-xl">
+          <Card className="border-0 shadow-xl bg-gray-900 border-gray-800">
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
-                <Mail className="h-12 w-12 text-blue-600" />
+                <Mail className="h-12 w-12 text-blue-400" />
               </div>
-              <CardTitle className="text-2xl">¡Registro Exitoso!</CardTitle>
-              <CardDescription className="text-base">Revisa tu email para confirmar tu cuenta</CardDescription>
+              <CardTitle className="text-2xl text-white">¡Registro Exitoso!</CardTitle>
+              <CardDescription className="text-base text-gray-300">
+                Revisa tu email para confirmar tu cuenta
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground text-center">
+              <p className="text-sm text-gray-400 text-center">
                 Te hemos enviado un email de confirmación. Haz clic en el enlace del email para activar tu cuenta y
                 comenzar a usar Automet Finanzas.
               </p>
 
               <div className="text-center space-y-3">
                 {!canResend ? (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-gray-400">
                     ¿No recibiste el email? Podrás reenviar en{" "}
-                    <span className="font-semibold text-blue-600">{countdown}s</span>
+                    <span className="font-semibold text-blue-400">{countdown}s</span>
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -91,7 +93,7 @@ export default function Page() {
                       onClick={handleResendEmail}
                       disabled={isResending}
                       variant="outline"
-                      className="w-full bg-transparent"
+                      className="w-full bg-transparent border-gray-700 text-white hover:bg-gray-800"
                     >
                       {isResending ? (
                         <>
@@ -107,7 +109,7 @@ export default function Page() {
                     </Button>
                     {resendMessage && (
                       <p
-                        className={`text-sm ${resendMessage.includes("exitosamente") ? "text-green-600" : "text-red-600"}`}
+                        className={`text-sm ${resendMessage.includes("exitosamente") ? "text-green-400" : "text-red-400"}`}
                       >
                         {resendMessage}
                       </p>
@@ -117,7 +119,10 @@ export default function Page() {
               </div>
 
               <Link href="/">
-                <Button variant="outline" className="w-full bg-transparent">
+                <Button
+                  variant="outline"
+                  className="w-full bg-transparent border-gray-700 text-white hover:bg-gray-800"
+                >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Volver al Login
                 </Button>
