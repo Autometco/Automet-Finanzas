@@ -1,282 +1,230 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+// app/api/webhook/n8n/route.ts
+import { NextResponse, type NextRequest } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-// ---------- helpers de infraestructura ----------
+type Json = Record<string, any>
 
-// Cliente admin (server-side)
-function createSupabaseAdmin() {
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  if (!url || !key) throw new Error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY');
-  return createClient(url, key);
+function bad(status: number, message: string, extra: Json = {}) {
+  return NextResponse.json({ ok: false, error: message, ...extra }, { status })
+}
+function ok(status: number, data: Json = {}) {
+  return NextResponse.json({ ok: true, ...data }, { status })
 }
 
-// Auth por API key (sin fallback inseguro)
+// --- seguridad ---
 function verifyApiKey(req: NextRequest) {
-  const provided = req.headers.get('x-api-key');
-  const expected = process.env.N8N_API_KEY;
-  return Boolean(expected) && provided === expected;
+  const header = req.headers.get("x-api-key") || ""
+  const env = process.env.N8N_API_KEY || ""
+  return header === env
 }
 
-// ---------- helpers de dominio ----------
+// --- supabase admin (server-only) ---
+function supabaseAdmin() {
+  const url = process.env.SUPABASE_URL!
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY! // service_role
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+}
 
-// Parser simple en español (tus reglas + algunas variantes)
+// --- util: resolver usuario por user_id o email ---
+async function resolveUserId({ user_id, email }: { user_id?: string; email?: string }) {
+  if (user_id) return user_id
+  if (!email) return null
+
+  const supabase = supabaseAdmin()
+
+  // 1) intentar en profiles.email
+  const { data: profile } = await supabase.from("profiles").select("id,email").eq("email", email).maybeSingle()
+  if (profile?.id) return profile.id as string
+
+  // 2) fallback: auth admin
+  const { data: users } = await supabase.auth.admin.listUsers()
+  const found = users.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
+  return found?.id ?? null
+}
+
+// --- util: parser simple de texto a transacción ---
 function parseTransactionFromText(text: string) {
-  const t = (text || '').toLowerCase();
+  const t = text.toLowerCase()
+  const isExpense = /(gast[ée]|compr[ée]|pag[ué])/.test(t)
+  const isIncome = /(ingreso|recib[íi]|cobré?)/.test(t)
+  const type = isIncome ? "income" : "expense"
 
-  // tipo
-  const isExpense = /(gast[ée]|compr[éeó]|pag[éeó]|sal[ií]o)/.test(t);
-  const isIncome  = /(recib[ií]|ingreso|cobr[éeó]|entr[oó]|deposit[éeó]|abono)/.test(t);
-  const type: 'income' | 'expense' = isExpense ? 'expense' : (isIncome ? 'income' : 'expense');
+  const amountMatch = text.match(/(\d+(?:[\.,]\d+)?)/)
+  const amount = amountMatch ? Number(amountMatch[0].replace(",", ".")) : 0
 
-  // monto
-  const match = t.match(/(\d+(?:[.,]\d+)?)/);
-  const amount = match ? Number.parseFloat(match[1].replace(',', '.')) : 0;
+  let category = "General"
+  if (/(comida|restaurante|alimentación)/.test(t)) category = "Alimentación"
+  else if (/(transporte|uber|taxi|bus)/.test(t)) category = "Transporte"
+  else if (/(entretenimiento|cine|diversión)/.test(t)) category = "Entretenimiento"
+  else if (/(servicios|luz|agua|internet)/.test(t)) category = "Servicios"
+  else if (/(salud|médic|farmacia)/.test(t)) category = "Salud"
+  else if (/(ropa|vestid|zapato)/.test(t)) category = "Ropa"
+  else if (/(hogar|casa|mueble)/.test(t)) category = "Hogar"
+  else if (/(ahorro)/.test(t)) category = "Ahorro"
 
-  // categorías básicas
-  let category = 'General';
-  if (/(comida|restaurante|alimentaci[oó]n)/.test(t)) category = 'Alimentación';
-  else if (/(transporte|uber|taxi|bus)/.test(t))    category = 'Transporte';
-  else if (/(hogar|casa|mueble)/.test(t))           category = 'Hogar';
-  else if (/(entretenimiento|cine|diversi[oó]n)/.test(t)) category = 'Entretenimiento';
-  else if (/(salud|m[eé]dico|farmacia)/.test(t))    category = 'Salud';
-  else if (/(ropa|vestido|zapatos)/.test(t))        category = 'Ropa';
-  else if (/(servicios|luz|agua|internet)/.test(t)) category = 'Servicios';
-  else if (/(ahorro|meta)/.test(t))                 category = 'Ahorro';
-
-  return { type, amount, category, description: text?.trim() ?? '' };
+  return { type, amount, category, description: text.trim() }
 }
 
-// Buscar user por email o usar user_id directo
-async function resolveUserId({ email, user_id }: { email?: string; user_id?: string }) {
-  if (user_id) return user_id;
+// --- acciones ---
+async function actionAddTransaction(payload: Json) {
+  const userId = await resolveUserId({ user_id: payload.user_id, email: payload.email })
+  if (!userId) return bad(404, "Usuario no encontrado")
 
-  if (!email) return null;
+  // permitir datos estructurados o text
+  const parsed = payload.text
+    ? parseTransactionFromText(payload.text as string)
+    : {
+        type: payload.type ?? "expense",
+        amount: Number(payload.amount ?? 0),
+        category: payload.category ?? "General",
+        description: payload.description ?? "Transacción",
+      }
 
-  const supabase = createSupabaseAdmin();
+  if (!parsed.amount || parsed.amount <= 0) return bad(400, "Monto inválido o no detectado")
 
-  // 1) intentar perfiles.email (si tu tabla lo almacena)
-  const { data: maybeProfile, error: profileErr } = await supabase
-    .from('profiles')
-    .select('id, email')
-    .eq('email', email)
-    .maybeSingle();
-
-  if (maybeProfile?.id) return maybeProfile.id;
-
-  // 2) fallback: admin listUsers y filtrar por email (service_role requerido)
-  // Nota: listUsers no filtra por email en la API, así que listamos 200 y filtramos localmente.
-  // Para bases pequeñas funciona bien; si creces, crea un RPC o guarda email en profiles.
-  const { data: usersList, error: listErr } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
-  if (listErr) return null;
-
-  const found = usersList?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-  return found?.id ?? null;
-}
-
-// ---------- acciones de negocio ----------
-
-async function actionAddTransaction(payload: any) {
-  const { email, user_id, text, audio_url, type, amount, description, category, date } = payload;
-
-  const resolvedUserId = await resolveUserId({ email, user_id });
-
-  // Si viene texto/audio => parsear; si ya viene estructurado => usarlo
-  let parsed = { type, amount, description, category } as any;
-
-  if (!type || !amount) {
-    const textToParse = text || (audio_url ? 'Transacción desde audio' : '');
-    parsed = parseTransactionFromText(textToParse);
-  }
-
-  if (!parsed.amount || Number.isNaN(Number(parsed.amount))) {
-    return { status: 400, body: { error: 'No se pudo determinar el monto' } };
-  }
-  if (!['income', 'expense'].includes(parsed.type)) {
-    return { status: 400, body: { error: 'type inválido (income|expense)' } };
-  }
-
-  const supabase = createSupabaseAdmin();
+  const supabase = supabaseAdmin()
   const { data, error } = await supabase
-    .from('transactions')
+    .from("transactions")
     .insert({
-      user_id: resolvedUserId,
+      user_id: userId,
       type: parsed.type,
-      amount: Number(parsed.amount),
-      description: parsed.description || description || null,
-      category: parsed.category || category || null,
-      date: date ?? new Date().toISOString().slice(0, 10),
+      amount: parsed.amount,
+      description: parsed.description,
+      category: parsed.category,
+      date: payload.date ?? new Date().toISOString().slice(0, 10),
     })
     .select()
-    .single();
+    .single()
 
-  if (error) return { status: 500, body: { error: error.message } };
-
-  return {
-    status: 201,
-    body: {
-      success: true,
-      message: `Transacción de ${parsed.type === 'expense' ? 'gasto' : 'ingreso'} registrada`,
-      transaction: data,
-      parsed_data: parsed,
-    },
-  };
+  if (error) return bad(500, "Error creando transacción", { detail: error.message })
+  return ok(201, { transaction: data, parsed })
 }
 
-async function actionCreateGoal(payload: any) {
-  const { email, user_id, name, target_amount, target_date } = payload;
+async function actionCreateGoal(payload: Json) {
+  const userId = await resolveUserId({ user_id: payload.user_id, email: payload.email })
+  if (!userId) return bad(404, "Usuario no encontrado")
 
-  if (!name || !target_amount) {
-    return { status: 400, body: { error: 'name y target_amount son requeridos' } };
-  }
+  const name = String(payload.name ?? "").trim()
+  const target = Number(payload.target_amount ?? 0)
+  const targetDate = payload.target_date ? String(payload.target_date) : null
+  if (!name || !target || target <= 0) return bad(400, "Parámetros inválidos (name/target_amount)")
 
-  const resolvedUserId = await resolveUserId({ email, user_id });
-  if (!resolvedUserId) return { status: 404, body: { error: 'Usuario no encontrado' } };
-
-  const supabase = createSupabaseAdmin();
+  const supabase = supabaseAdmin()
   const { data, error } = await supabase
-    .from('savings_goals')
+    .from("savings_goals")
     .insert({
-      user_id: resolvedUserId,
+      user_id: userId,
       name,
-      target_amount: Number(target_amount),
-      target_date: target_date ?? null,
+      target_amount: target,
+      target_date: targetDate,
       current_amount: 0,
     })
     .select()
-    .single();
+    .single()
 
-  if (error) return { status: 500, body: { error: error.message } };
-
-  return { status: 201, body: { success: true, goal: data } };
+  if (error) return bad(500, "Error creando meta", { detail: error.message })
+  return ok(201, { goal: data })
 }
 
-async function actionDepositToGoal(payload: any) {
-  const { email, user_id, goal_id, goal_name, amount, create_expense_tx = true } = payload;
+async function actionDepositToGoal(payload: Json) {
+  const userId = await resolveUserId({ user_id: payload.user_id, email: payload.email })
+  if (!userId) return bad(404, "Usuario no encontrado")
 
-  if (!amount || Number.isNaN(Number(amount))) {
-    return { status: 400, body: { error: 'amount inválido' } };
+  const amount = Number(payload.amount ?? 0)
+  if (!amount || amount <= 0) return bad(400, "Monto inválido")
+
+  const supabase = supabaseAdmin()
+
+  // localizar meta por id o por nombre
+  let goalId = payload.goal_id as string | undefined
+  let goal: any = null
+
+  if (goalId) {
+    const { data } = await supabase.from("savings_goals").select("*").eq("id", goalId).eq("user_id", userId).maybeSingle()
+    goal = data
+  } else if (payload.goal_name) {
+    const { data } = await supabase
+      .from("savings_goals")
+      .select("*")
+      .eq("user_id", userId)
+      .ilike("name", String(payload.goal_name))
+      .maybeSingle()
+    goal = data
   }
 
-  const resolvedUserId = await resolveUserId({ email, user_id });
-  if (!resolvedUserId) return { status: 404, body: { error: 'Usuario no encontrado' } };
+  if (!goal) return bad(404, "Meta no encontrada")
 
-  const supabase = createSupabaseAdmin();
+  const newCurrent = Math.min(goal.current_amount + amount, goal.target_amount)
 
-  // Buscar la meta por id o por nombre
-  let goal: any = null;
-  if (goal_id) {
-    const { data, error } = await supabase
-      .from('savings_goals')
-      .select('*')
-      .eq('id', goal_id)
-      .eq('user_id', resolvedUserId)
-      .single();
-    if (error || !data) return { status: 404, body: { error: 'Meta no encontrada' } };
-    goal = data;
-  } else if (goal_name) {
-    const { data, error } = await supabase
-      .from('savings_goals')
-      .select('*')
-      .eq('user_id', resolvedUserId)
-      .ilike('name', goal_name) // flexible
-      .maybeSingle();
-    if (error || !data) return { status: 404, body: { error: 'Meta no encontrada' } };
-    goal = data;
-  } else {
-    return { status: 400, body: { error: 'goal_id o goal_name requerido' } };
-  }
-
-  const add = Number(amount);
-  const newCurrent = Math.min((goal.current_amount ?? 0) + add, goal.target_amount);
-
-  const { error: updateErr } = await supabase
-    .from('savings_goals')
+  const { error: updErr } = await supabase
+    .from("savings_goals")
     .update({ current_amount: newCurrent })
-    .eq('id', goal.id);
+    .eq("id", goal.id)
 
-  if (updateErr) return { status: 500, body: { error: updateErr.message } };
+  if (updErr) return bad(500, "Error actualizando meta", { detail: updErr.message })
 
-  let createdTx: any = null;
-  if (create_expense_tx) {
-    const { data: tx, error: txErr } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: resolvedUserId,
-        type: 'expense',
-        category: 'Ahorro',
-        description: `Depósito a ${goal.name}`,
-        amount: add,
-        date: new Date().toISOString().slice(0, 10),
-      })
-      .select()
-      .single();
-    if (!txErr) createdTx = tx;
+  // opcional: registrar transacción de “depósito a …”
+  if (payload.create_expense_tx !== false) {
+    await supabase.from("transactions").insert({
+      user_id: userId,
+      type: "expense",
+      category: "Ahorro",
+      description: `Depósito a ${goal.name}`,
+      amount,
+      date: new Date().toISOString().slice(0, 10),
+    })
   }
 
-  return {
-    status: 200,
-    body: {
-      success: true,
-      goal: { ...goal, current_amount: newCurrent },
-      transaction: createdTx,
-    },
-  };
+  return ok(200, { goal: { ...goal, current_amount: newCurrent } })
 }
 
-async function actionGetMonthSummary(payload: any) {
-  const { email, user_id, month, year } = payload;
+async function actionGetMonthSummary(payload: Json) {
+  const userId = await resolveUserId({ user_id: payload.user_id, email: payload.email })
+  if (!userId) return bad(404, "Usuario no encontrado")
 
-  const resolvedUserId = await resolveUserId({ email, user_id });
-  if (!resolvedUserId) return { status: 404, body: { error: 'Usuario no encontrado' } };
+  const now = new Date()
+  const year = Number(payload.year ?? now.getFullYear())
+  const month = Number(payload.month ?? now.getMonth()) // 0..11
 
-  const d = new Date();
-  const m = Number.isFinite(month) ? month : d.getMonth(); // 0-11
-  const y = Number.isFinite(year)  ? year  : d.getFullYear();
+  const start = new Date(year, month, 1)
+  const end = new Date(year, month + 1, 1)
 
-  const start = new Date(y, m, 1).toISOString().slice(0, 10);
-  const end   = new Date(y, m + 1, 1).toISOString().slice(0, 10);
-
-  const supabase = createSupabaseAdmin();
+  const supabase = supabaseAdmin()
   const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', resolvedUserId)
-    .gte('date', start)
-    .lt('date', end);
+    .from("transactions")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("date", start.toISOString().slice(0, 10))
+    .lt("date", end.toISOString().slice(0, 10))
 
-  if (error) return { status: 500, body: { error: error.message } };
+  if (error) return bad(500, "Error consultando transacciones", { detail: error.message })
 
-  const income  = (data ?? []).filter(t => t.type === 'income')
-                     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
-  const expense = (data ?? []).filter(t => t.type === 'expense')
-                     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
-
-  return { status: 200, body: { month: m, year: y, income, expense, balance: income - expense } };
+  const income = (data ?? []).filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0)
+  const expense = (data ?? []).filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0)
+  return ok(200, { year, month, summary: { income, expense, balance: income - expense }, count: data?.length ?? 0 })
 }
 
-// ---------- handler principal ----------
-
-export async function POST(request: NextRequest) {
+// --- handler principal ---
+export async function POST(req: NextRequest) {
   try {
-    if (!verifyApiKey(request)) {
-      return NextResponse.json({ error: 'API key inválida' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { action = 'add_transaction' } = body;
+    if (!verifyApiKey(req)) return bad(401, "API key inválida")
+    const body = (await req.json()) as Json
+    const action = String(body.action ?? "add_transaction")
 
     switch (action) {
-      case 'add_transaction':   return NextResponse.json(...Object.values(await actionAddTransaction(body)));
-      case 'create_goal':       return NextResponse.json(...Object.values(await actionCreateGoal(body)));
-      case 'deposit_to_goal':   return NextResponse.json(...Object.values(await actionDepositToGoal(body)));
-      case 'get_month_summary': return NextResponse.json(...Object.values(await actionGetMonthSummary(body)));
-      case 'parse_only':        return NextResponse.json({ parsed: parseTransactionFromText(body.text || '') }, { status: 200 });
+      case "add_transaction":
+        return await actionAddTransaction(body)
+      case "create_goal":
+        return await actionCreateGoal(body)
+      case "deposit_to_goal":
+        return await actionDepositToGoal(body)
+      case "get_month_summary":
+        return await actionGetMonthSummary(body)
       default:
-        return NextResponse.json({ error: 'Acción no soportada' }, { status: 400 });
+        return bad(400, `Acción no soportada: ${action}`)
     }
-  } catch (err: any) {
-    console.error('Error en webhook n8n:', err);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+  } catch (e: any) {
+    console.error("Webhook error:", e)
+    return bad(500, "Error interno del servidor")
   }
 }
