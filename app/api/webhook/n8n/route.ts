@@ -1,155 +1,282 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { NextResponse, type NextRequest } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// Función para crear cliente de Supabase en el servidor
-function createSupabaseServerClient() {
-  const cookieStore = cookies()
+// ---------- helpers de infraestructura ----------
 
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value
-      },
-    },
-  })
+// Cliente admin (server-side)
+function createSupabaseAdmin() {
+  const url = process.env.SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  if (!url || !key) throw new Error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY');
+  return createClient(url, key);
 }
 
-// Función para verificar API key
-function verifyApiKey(request: NextRequest) {
-  const apiKey = request.headers.get("x-api-key")
-  const validApiKey = process.env.N8N_API_KEY || "your-secret-api-key"
-
-  return apiKey === validApiKey
+// Auth por API key (sin fallback inseguro)
+function verifyApiKey(req: NextRequest) {
+  const provided = req.headers.get('x-api-key');
+  const expected = process.env.N8N_API_KEY;
+  return Boolean(expected) && provided === expected;
 }
 
-// Función para obtener usuario por email
-async function getUserByEmail(email: string) {
-  const supabase = createSupabaseServerClient()
+// ---------- helpers de dominio ----------
 
-  const { data: profile, error } = await supabase.from("profiles").select("*").eq("email", email).single()
+// Parser simple en español (tus reglas + algunas variantes)
+function parseTransactionFromText(text: string) {
+  const t = (text || '').toLowerCase();
 
-  if (error || !profile) {
-    return null
+  // tipo
+  const isExpense = /(gast[ée]|compr[éeó]|pag[éeó]|sal[ií]o)/.test(t);
+  const isIncome  = /(recib[ií]|ingreso|cobr[éeó]|entr[oó]|deposit[éeó]|abono)/.test(t);
+  const type: 'income' | 'expense' = isExpense ? 'expense' : (isIncome ? 'income' : 'expense');
+
+  // monto
+  const match = t.match(/(\d+(?:[.,]\d+)?)/);
+  const amount = match ? Number.parseFloat(match[1].replace(',', '.')) : 0;
+
+  // categorías básicas
+  let category = 'General';
+  if (/(comida|restaurante|alimentaci[oó]n)/.test(t)) category = 'Alimentación';
+  else if (/(transporte|uber|taxi|bus)/.test(t))    category = 'Transporte';
+  else if (/(hogar|casa|mueble)/.test(t))           category = 'Hogar';
+  else if (/(entretenimiento|cine|diversi[oó]n)/.test(t)) category = 'Entretenimiento';
+  else if (/(salud|m[eé]dico|farmacia)/.test(t))    category = 'Salud';
+  else if (/(ropa|vestido|zapatos)/.test(t))        category = 'Ropa';
+  else if (/(servicios|luz|agua|internet)/.test(t)) category = 'Servicios';
+  else if (/(ahorro|meta)/.test(t))                 category = 'Ahorro';
+
+  return { type, amount, category, description: text?.trim() ?? '' };
+}
+
+// Buscar user por email o usar user_id directo
+async function resolveUserId({ email, user_id }: { email?: string; user_id?: string }) {
+  if (user_id) return user_id;
+
+  if (!email) return null;
+
+  const supabase = createSupabaseAdmin();
+
+  // 1) intentar perfiles.email (si tu tabla lo almacena)
+  const { data: maybeProfile, error: profileErr } = await supabase
+    .from('profiles')
+    .select('id, email')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (maybeProfile?.id) return maybeProfile.id;
+
+  // 2) fallback: admin listUsers y filtrar por email (service_role requerido)
+  // Nota: listUsers no filtra por email en la API, así que listamos 200 y filtramos localmente.
+  // Para bases pequeñas funciona bien; si creces, crea un RPC o guarda email en profiles.
+  const { data: usersList, error: listErr } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
+  if (listErr) return null;
+
+  const found = usersList?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  return found?.id ?? null;
+}
+
+// ---------- acciones de negocio ----------
+
+async function actionAddTransaction(payload: any) {
+  const { email, user_id, text, audio_url, type, amount, description, category, date } = payload;
+
+  const resolvedUserId = await resolveUserId({ email, user_id });
+
+  // Si viene texto/audio => parsear; si ya viene estructurado => usarlo
+  let parsed = { type, amount, description, category } as any;
+
+  if (!type || !amount) {
+    const textToParse = text || (audio_url ? 'Transacción desde audio' : '');
+    parsed = parseTransactionFromText(textToParse);
   }
 
-  return profile
+  if (!parsed.amount || Number.isNaN(Number(parsed.amount))) {
+    return { status: 400, body: { error: 'No se pudo determinar el monto' } };
+  }
+  if (!['income', 'expense'].includes(parsed.type)) {
+    return { status: 400, body: { error: 'type inválido (income|expense)' } };
+  }
+
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert({
+      user_id: resolvedUserId,
+      type: parsed.type,
+      amount: Number(parsed.amount),
+      description: parsed.description || description || null,
+      category: parsed.category || category || null,
+      date: date ?? new Date().toISOString().slice(0, 10),
+    })
+    .select()
+    .single();
+
+  if (error) return { status: 500, body: { error: error.message } };
+
+  return {
+    status: 201,
+    body: {
+      success: true,
+      message: `Transacción de ${parsed.type === 'expense' ? 'gasto' : 'ingreso'} registrada`,
+      transaction: data,
+      parsed_data: parsed,
+    },
+  };
 }
 
-// Función para procesar texto con IA (simulada)
-function parseTransactionFromText(text: string) {
-  // Esta función simula el procesamiento de IA
-  // En una implementación real, usarías OpenAI o Claude para extraer datos
+async function actionCreateGoal(payload: any) {
+  const { email, user_id, name, target_amount, target_date } = payload;
 
-  const lowerText = text.toLowerCase()
+  if (!name || !target_amount) {
+    return { status: 400, body: { error: 'name y target_amount son requeridos' } };
+  }
 
-  // Detectar tipo de transacción
-  const isExpense = lowerText.includes("gasté") || lowerText.includes("compré") || lowerText.includes("pagué")
-  const isIncome = lowerText.includes("recibí") || lowerText.includes("ingreso") || lowerText.includes("cobré")
+  const resolvedUserId = await resolveUserId({ email, user_id });
+  if (!resolvedUserId) return { status: 404, body: { error: 'Usuario no encontrado' } };
 
-  // Extraer monto (buscar números)
-  const amountMatch = text.match(/(\d+(?:\.\d+)?)/g)
-  const amount = amountMatch ? Number.parseFloat(amountMatch[0]) : 0
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('savings_goals')
+    .insert({
+      user_id: resolvedUserId,
+      name,
+      target_amount: Number(target_amount),
+      target_date: target_date ?? null,
+      current_amount: 0,
+    })
+    .select()
+    .single();
 
-  // Detectar categoría
-  let category = "General"
-  if (lowerText.includes("comida") || lowerText.includes("restaurante") || lowerText.includes("alimentación")) {
-    category = "Alimentación"
-  } else if (lowerText.includes("transporte") || lowerText.includes("uber") || lowerText.includes("taxi")) {
-    category = "Transporte"
-  } else if (lowerText.includes("hogar") || lowerText.includes("casa") || lowerText.includes("mueble")) {
-    category = "Hogar"
-  } else if (lowerText.includes("entretenimiento") || lowerText.includes("cine") || lowerText.includes("diversión")) {
-    category = "Entretenimiento"
-  } else if (lowerText.includes("salud") || lowerText.includes("médico") || lowerText.includes("farmacia")) {
-    category = "Salud"
-  } else if (lowerText.includes("ropa") || lowerText.includes("vestido") || lowerText.includes("zapatos")) {
-    category = "Ropa"
-  } else if (lowerText.includes("servicios") || lowerText.includes("luz") || lowerText.includes("agua")) {
-    category = "Servicios"
+  if (error) return { status: 500, body: { error: error.message } };
+
+  return { status: 201, body: { success: true, goal: data } };
+}
+
+async function actionDepositToGoal(payload: any) {
+  const { email, user_id, goal_id, goal_name, amount, create_expense_tx = true } = payload;
+
+  if (!amount || Number.isNaN(Number(amount))) {
+    return { status: 400, body: { error: 'amount inválido' } };
+  }
+
+  const resolvedUserId = await resolveUserId({ email, user_id });
+  if (!resolvedUserId) return { status: 404, body: { error: 'Usuario no encontrado' } };
+
+  const supabase = createSupabaseAdmin();
+
+  // Buscar la meta por id o por nombre
+  let goal: any = null;
+  if (goal_id) {
+    const { data, error } = await supabase
+      .from('savings_goals')
+      .select('*')
+      .eq('id', goal_id)
+      .eq('user_id', resolvedUserId)
+      .single();
+    if (error || !data) return { status: 404, body: { error: 'Meta no encontrada' } };
+    goal = data;
+  } else if (goal_name) {
+    const { data, error } = await supabase
+      .from('savings_goals')
+      .select('*')
+      .eq('user_id', resolvedUserId)
+      .ilike('name', goal_name) // flexible
+      .maybeSingle();
+    if (error || !data) return { status: 404, body: { error: 'Meta no encontrada' } };
+    goal = data;
+  } else {
+    return { status: 400, body: { error: 'goal_id o goal_name requerido' } };
+  }
+
+  const add = Number(amount);
+  const newCurrent = Math.min((goal.current_amount ?? 0) + add, goal.target_amount);
+
+  const { error: updateErr } = await supabase
+    .from('savings_goals')
+    .update({ current_amount: newCurrent })
+    .eq('id', goal.id);
+
+  if (updateErr) return { status: 500, body: { error: updateErr.message } };
+
+  let createdTx: any = null;
+  if (create_expense_tx) {
+    const { data: tx, error: txErr } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: resolvedUserId,
+        type: 'expense',
+        category: 'Ahorro',
+        description: `Depósito a ${goal.name}`,
+        amount: add,
+        date: new Date().toISOString().slice(0, 10),
+      })
+      .select()
+      .single();
+    if (!txErr) createdTx = tx;
   }
 
   return {
-    type: isExpense ? "expense" : isIncome ? "income" : "expense",
-    amount: amount,
-    category: category,
-    description: text.trim(),
-  }
+    status: 200,
+    body: {
+      success: true,
+      goal: { ...goal, current_amount: newCurrent },
+      transaction: createdTx,
+    },
+  };
 }
 
-// POST /api/webhook/n8n - Webhook específico para n8n con procesamiento de audio/texto
+async function actionGetMonthSummary(payload: any) {
+  const { email, user_id, month, year } = payload;
+
+  const resolvedUserId = await resolveUserId({ email, user_id });
+  if (!resolvedUserId) return { status: 404, body: { error: 'Usuario no encontrado' } };
+
+  const d = new Date();
+  const m = Number.isFinite(month) ? month : d.getMonth(); // 0-11
+  const y = Number.isFinite(year)  ? year  : d.getFullYear();
+
+  const start = new Date(y, m, 1).toISOString().slice(0, 10);
+  const end   = new Date(y, m + 1, 1).toISOString().slice(0, 10);
+
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', resolvedUserId)
+    .gte('date', start)
+    .lt('date', end);
+
+  if (error) return { status: 500, body: { error: error.message } };
+
+  const income  = (data ?? []).filter(t => t.type === 'income')
+                     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+  const expense = (data ?? []).filter(t => t.type === 'expense')
+                     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+
+  return { status: 200, body: { month: m, year: y, income, expense, balance: income - expense } };
+}
+
+// ---------- handler principal ----------
+
 export async function POST(request: NextRequest) {
   try {
-    // Verificar API key
     if (!verifyApiKey(request)) {
-      return NextResponse.json({ error: "API key inválida" }, { status: 401 })
+      return NextResponse.json({ error: 'API key inválida' }, { status: 401 });
     }
 
-    const body = await request.json()
-    const { email, text, audio_url, action = "add_transaction" } = body
+    const body = await request.json();
+    const { action = 'add_transaction' } = body;
 
-    // Validar campos requeridos
-    if (!email) {
-      return NextResponse.json({ error: "Email requerido" }, { status: 400 })
+    switch (action) {
+      case 'add_transaction':   return NextResponse.json(...Object.values(await actionAddTransaction(body)));
+      case 'create_goal':       return NextResponse.json(...Object.values(await actionCreateGoal(body)));
+      case 'deposit_to_goal':   return NextResponse.json(...Object.values(await actionDepositToGoal(body)));
+      case 'get_month_summary': return NextResponse.json(...Object.values(await actionGetMonthSummary(body)));
+      case 'parse_only':        return NextResponse.json({ parsed: parseTransactionFromText(body.text || '') }, { status: 200 });
+      default:
+        return NextResponse.json({ error: 'Acción no soportada' }, { status: 400 });
     }
-
-    // Obtener usuario por email
-    const user = await getUserByEmail(email)
-    if (!user) {
-      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 })
-    }
-
-    const supabase = createSupabaseServerClient()
-
-    // Procesar según la acción
-    if (action === "add_transaction") {
-      if (!text && !audio_url) {
-        return NextResponse.json({ error: "Texto o URL de audio requerido" }, { status: 400 })
-      }
-
-      // Si hay audio_url, n8n ya debería haber transcrito el audio
-      // Por ahora asumimos que tenemos el texto
-      const transactionText = text || "Transacción desde audio"
-
-      // Procesar el texto para extraer datos de la transacción
-      const parsedTransaction = parseTransactionFromText(transactionText)
-
-      if (parsedTransaction.amount === 0) {
-        return NextResponse.json({ error: "No se pudo extraer el monto de la transacción" }, { status: 400 })
-      }
-
-      // Crear transacción
-      const { data: transaction, error } = await supabase
-        .from("transactions")
-        .insert({
-          user_id: user.id,
-          type: parsedTransaction.type,
-          amount: parsedTransaction.amount,
-          description: parsedTransaction.description,
-          category: parsedTransaction.category,
-          date: new Date().toISOString().split("T")[0],
-        })
-        .select()
-        .single()
-
-      if (error) {
-        console.error("Error creando transacción:", error)
-        return NextResponse.json({ error: "Error creando transacción" }, { status: 500 })
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: `Transacción de ${parsedTransaction.type === "expense" ? "gasto" : "ingreso"} registrada exitosamente`,
-        transaction: transaction,
-        parsed_data: parsedTransaction,
-        original_text: transactionText,
-      })
-    }
-
-    // Otras acciones futuras (crear metas, consultar balance, etc.)
-    return NextResponse.json({ error: "Acción no soportada" }, { status: 400 })
-  } catch (error) {
-    console.error("Error en webhook de n8n:", error)
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+  } catch (err: any) {
+    console.error('Error en webhook n8n:', err);
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
