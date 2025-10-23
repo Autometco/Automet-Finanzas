@@ -6,14 +6,7 @@ interface LightningLogoProps {
 export function LightningLogo({ className = "", size = 40 }: LightningLogoProps) {
   return (
     <div className={`relative ${className}`} style={{ width: size, height: size }}>
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 40 40"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="animate-lightning-glow"
-      >
+      <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
           d="M20 2L12 18H18L16 38L28 22H22L20 2Z"
           fill="url(#lightning-gradient)"
@@ -36,8 +29,6 @@ export function LightningLogo({ className = "", size = 40 }: LightningLogoProps)
           </linearGradient>
         </defs>
       </svg>
-
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-full blur-md -z-10 animate-pulse" />
     </div>
   )
 }

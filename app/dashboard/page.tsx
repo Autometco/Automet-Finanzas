@@ -369,18 +369,19 @@ export default function Dashboard() {
         {showConfetti && (
           <>
             <ConfettiAnimation onComplete={handleConfettiComplete} />
-            <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-auto">
-              <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg p-8 text-center shadow-2xl animate-bounce-twice relative">
+            {/* Adding glassmorphism to congratulations modal */}
+            <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-auto bg-black/50 backdrop-blur-sm">
+              <div className="glass-card p-8 text-center shadow-2xl animate-scale-in relative max-w-md mx-4 rounded-2xl">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleCloseCongratulations}
-                  className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-muted"
+                  className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-muted micro-bounce"
                 >
                   <X className="w-4 h-4" />
                 </Button>
-                <div className="text-6xl mb-4">🎉</div>
-                <h2 className="text-2xl font-bold text-primary mb-2">¡Felicitaciones!</h2>
+                <div className="text-6xl mb-4 animate-float">🎉</div>
+                <h2 className="text-2xl font-bold text-primary mb-2 animate-glow-pulse">¡Felicitaciones!</h2>
                 <p className="text-lg text-foreground">
                   Has completado tu meta: <span className="font-semibold text-success">{completedGoalName}</span>
                 </p>
@@ -392,7 +393,8 @@ export default function Dashboard() {
 
         {showHighExpenseAlert && (
           <div className="fixed bottom-4 left-4 z-50 max-w-sm">
-            <div className="bg-destructive/90 backdrop-blur-sm text-destructive-foreground p-4 rounded-lg shadow-lg border border-destructive/20 animate-fade-in-up">
+            {/* Adding glassmorphism to alert */}
+            <div className="glass-card bg-destructive/20 text-destructive-foreground p-4 rounded-lg shadow-lg border border-destructive/30 animate-fade-in-up">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
@@ -418,7 +420,7 @@ export default function Dashboard() {
         )}
 
         {/* Header */}
-        <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+        <header className="border-b border-border/50 backdrop-blur-xl bg-background/10 sticky top-0 z-10 shadow-lg">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
               {/* Logo and greeting section */}
@@ -484,28 +486,28 @@ export default function Dashboard() {
         <main className="max-w-7xl mx-auto p-4 space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="animate-fade-in-up border-0 shadow-lg bg-gradient-to-br from-primary/5 to-primary/10 hover-lift">
-              <CardContent className="p-6">
+            <Card className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-success hover-lift smooth-transition overflow-hidden">
+              <CardContent className="p-6 relative z-10">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Ingresos del Mes</p>
-                    <p className="text-2xl font-bold text-primary">${(summary?.income || 0).toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-success">${(summary?.income || 0).toLocaleString()}</p>
                     {(summary?.income || 0) === 0 && (
                       <p className="text-xs text-muted-foreground mt-1">Agrega tu primer ingreso</p>
                     )}
                   </div>
-                  <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
-                    <DollarSign className="w-6 h-6 text-primary" />
+                  <div className="w-12 h-12 neuro-inset rounded-full flex items-center justify-center liquid-glow">
+                    <DollarSign className="w-6 h-6 text-success" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card
-              className="animate-fade-in-up border-0 shadow-lg bg-gradient-to-br from-destructive/5 to-destructive/10 hover-lift"
+              className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-danger hover-lift smooth-transition overflow-hidden"
               style={{ animationDelay: "0.1s" }}
             >
-              <CardContent className="p-6">
+              <CardContent className="p-6 relative z-10">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Gastos del Mes</p>
@@ -514,7 +516,7 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground mt-1">Registra tus gastos</p>
                     )}
                   </div>
-                  <div className="w-12 h-12 bg-destructive/20 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-12 neuro-inset rounded-full flex items-center justify-center liquid-glow">
                     <CreditCard className="w-6 h-6 text-destructive" />
                   </div>
                 </div>
@@ -522,10 +524,10 @@ export default function Dashboard() {
             </Card>
 
             <Card
-              className="animate-fade-in-up border-0 shadow-lg bg-gradient-to-br from-success/5 to-success/10 hover-lift"
+              className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-primary hover-lift smooth-transition overflow-hidden"
               style={{ animationDelay: "0.2s" }}
             >
-              <CardContent className="p-6">
+              <CardContent className="p-6 relative z-10">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Balance/Ahorro</p>
@@ -538,7 +540,7 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground mt-1">Tu balance aparecerá aquí</p>
                     )}
                   </div>
-                  <div className="w-12 h-12 bg-success/20 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-12 neuro-inset rounded-full flex items-center justify-center liquid-glow">
                     <Wallet className="w-6 h-6 text-success" />
                   </div>
                 </div>
@@ -548,7 +550,7 @@ export default function Dashboard() {
 
           {motivationalStats && hasTransactions && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="animate-fade-in-up border-0 shadow-lg border-l-4 border-l-success hover-lift">
+              <Card className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-success hover-lift smooth-transition overflow-hidden">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-success">
                     <TrendingUp className="w-5 h-5" />
@@ -563,7 +565,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="animate-fade-in-up border-0 shadow-lg border-l-4 border-l-primary hover-lift">
+              <Card className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-primary hover-lift smooth-transition overflow-hidden">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-primary">
                     <Zap className="w-5 h-5" />
@@ -580,7 +582,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="animate-fade-in-up border-0 shadow-lg border-l-4 border-l-warning hover-lift">
+              <Card className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-warning hover-lift smooth-transition overflow-hidden">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-warning">
                     <Target className="w-5 h-5" />
@@ -599,12 +601,15 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Expense Chart */}
-            <Card className="animate-fade-in-up border-0 shadow-lg hover-lift" style={{ animationDelay: "0.3s" }}>
+            <Card
+              className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-primary hover-lift smooth-transition overflow-hidden"
+              style={{ animationDelay: "0.3s" }}
+            >
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-glow-pulse"></div>
                       Distribución de Gastos
                     </CardTitle>
                     <CardDescription>Gastos por categoría este mes</CardDescription>
@@ -695,10 +700,13 @@ export default function Dashboard() {
             </Card>
 
             {/* Recent Transactions */}
-            <Card className="animate-fade-in-up border-0 shadow-lg hover-lift" style={{ animationDelay: "0.4s" }}>
+            <Card
+              className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-secondary hover-lift smooth-transition overflow-hidden"
+              style={{ animationDelay: "0.4s" }}
+            >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-secondary rounded-full"></div>
+                  <div className="w-2 h-2 bg-secondary rounded-full animate-glow-pulse"></div>
                   Movimientos Recientes
                 </CardTitle>
                 <CardDescription>Últimas transacciones</CardDescription>
@@ -709,7 +717,8 @@ export default function Dashboard() {
                     {recentTransactions.slice(0, 5).map((transaction) => (
                       <div
                         key={transaction.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors hover-lift-subtle"
+                        /* Enhanced neumorphism with liquid glow effect */
+                        className="flex items-center justify-between p-3 rounded-lg neuro-inset hover:neuro-card smooth-transition hover-lift-subtle micro-bounce liquid-glow-subtle"
                       >
                         <div className="flex items-center gap-3">
                           <div
@@ -762,12 +771,15 @@ export default function Dashboard() {
           </div>
 
           {/* Savings Goals */}
-          <Card className="animate-fade-in-up border-0 shadow-lg hover-lift" style={{ animationDelay: "0.5s" }}>
+          <Card
+            className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-success hover-lift smooth-transition overflow-hidden"
+            style={{ animationDelay: "0.5s" }}
+          >
             <CardHeader>
               <div className="space-y-4 md:space-y-0">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Target className="w-5 h-5 text-primary" />
+                    <Target className="w-5 h-5 text-primary animate-glow-pulse" />
                     Metas de Ahorro
                   </CardTitle>
                   <CardDescription>Tu progreso hacia tus objetivos financieros</CardDescription>
@@ -776,12 +788,13 @@ export default function Dashboard() {
                 <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
                   <Dialog open={isDepositDialogOpen} onOpenChange={setIsDepositDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" className="hover-lift-subtle bg-transparent w-full sm:w-auto">
+                      {/* Adding glass button effect */}
+                      <Button variant="outline" className="glass-button w-full sm:w-auto micro-bounce bg-transparent">
                         <PiggyBank className="w-4 h-4 mr-2" />
                         Depósito de Ahorro
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-card border-border">
+                    <DialogContent className="glass-card border-border/50">
                       <DialogHeader>
                         <DialogTitle className="text-foreground">Depositar en Meta de Ahorro</DialogTitle>
                         <DialogDescription className="text-muted-foreground">
@@ -864,12 +877,13 @@ export default function Dashboard() {
 
                   <Dialog open={isAddingGoal} onOpenChange={setIsAddingGoal}>
                     <DialogTrigger asChild>
-                      <Button className="hover-lift-subtle w-full sm:w-auto">
+                      {/* Adding glass button effect with gradient */}
+                      <Button className="gradient-animate w-full sm:w-auto micro-bounce">
                         <Plus className="w-4 h-4 mr-2" />
                         Nueva Meta
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-card border-border">
+                    <DialogContent className="glass-card border-border/50">
                       <DialogHeader>
                         <DialogTitle className="text-foreground">Agregar Nueva Meta de Ahorro</DialogTitle>
                         <DialogDescription className="text-muted-foreground">
@@ -952,7 +966,9 @@ export default function Dashboard() {
                     return (
                       <div
                         key={goal.id}
-                        className="space-y-3 hover-lift-subtle p-4 rounded-lg bg-muted/20 relative group"
+                        /* Enhanced neumorphism with liquid glass border */
+                        className="space-y-3 neuro-card p-4 rounded-lg relative group smooth-transition hover-lift liquid-glass-border"
+                        style={{ borderColor: goal.color }}
                       >
                         <Button
                           variant="ghost"
@@ -992,7 +1008,11 @@ export default function Dashboard() {
           </Card>
 
           {monthlyHistory.length > 0 && (
-            <Card className="animate-fade-in-up border-0 shadow-lg hover-lift">
+            /* Applying liquid glass effect to monthly history card */
+            <Card
+              className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-primary hover-lift smooth-transition overflow-hidden"
+              style={{ animationDelay: "0.5s" }}
+            >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-primary" />
@@ -1059,36 +1079,36 @@ export default function Dashboard() {
             </Card>
           )}
 
-          <Card className="animate-fade-in-up border-0 shadow-lg hover-lift">
+          <Card className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-warning hover-lift smooth-transition overflow-hidden">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-primary" />
+                <Target className="w-5 h-5 text-primary animate-glow-pulse" />
                 Objetivos Financieros
               </CardTitle>
               <CardDescription>Metas y recomendaciones para mejorar tus finanzas</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-success/10 border border-success/20">
+                <div className="p-4 rounded-lg neuro-card border-l-4 border-l-success smooth-transition hover-lift-subtle liquid-glow-subtle">
                   <h4 className="font-medium text-success mb-2">🎯 Meta de Ahorro</h4>
                   <p className="text-sm text-muted-foreground">
                     Intenta ahorrar al menos el 20% de tus ingresos mensuales para construir un fondo de emergencia
                     sólido.
                   </p>
                 </div>
-                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                <div className="p-4 rounded-lg neuro-card border-l-4 border-l-primary smooth-transition hover-lift-subtle liquid-glow-subtle">
                   <h4 className="font-medium text-primary mb-2">📊 Control de Gastos</h4>
                   <p className="text-sm text-muted-foreground">
                     Mantén tus gastos fijos por debajo del 50% de tus ingresos para tener flexibilidad financiera.
                   </p>
                 </div>
-                <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
+                <div className="p-4 rounded-lg neuro-card border-l-4 border-l-warning smooth-transition hover-lift-subtle liquid-glow-subtle">
                   <h4 className="font-medium text-warning mb-2">💰 Fondo de Emergencia</h4>
                   <p className="text-sm text-muted-foreground">
                     Construye un fondo que cubra 3-6 meses de gastos esenciales para estar preparado ante imprevistos.
                   </p>
                 </div>
-                <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/20">
+                <div className="p-4 rounded-lg neuro-card border-l-4 border-l-secondary smooth-transition hover-lift-subtle liquid-glow-subtle">
                   <h4 className="font-medium text-secondary mb-2">📈 Inversión</h4>
                   <p className="text-sm text-muted-foreground">
                     Una vez tengas tu fondo de emergencia, considera invertir para hacer crecer tu dinero a largo plazo.
@@ -1101,7 +1121,7 @@ export default function Dashboard() {
           {hasTransactions && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card
-                className="animate-fade-in-up border-0 shadow-lg border-l-4 border-l-warning hover-lift"
+                className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-warning hover-lift smooth-transition overflow-hidden"
                 style={{ animationDelay: "0.6s" }}
               >
                 <CardHeader>
@@ -1118,7 +1138,7 @@ export default function Dashboard() {
               </Card>
 
               <Card
-                className="animate-fade-in-up border-0 shadow-lg border-l-4 border-l-primary hover-lift"
+                className="animate-fade-in-up border-0 shadow-2xl liquid-glass liquid-glass-primary hover-lift smooth-transition overflow-hidden"
                 style={{ animationDelay: "0.7s" }}
               >
                 <CardHeader>
