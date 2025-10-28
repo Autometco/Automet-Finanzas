@@ -652,6 +652,3 @@
   border-style: solid;
   border-image: linear-gradient(135deg, currentColor, transparent, currentColor) 1;
 }
-
-.liquid-glow-subtle {\
-  box-shadow: 0 0 15px rgba(101, 255, 149, 0.1), 0
